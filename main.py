@@ -1,9 +1,11 @@
 from telebot import *
 import sqlite3
 from dotenv import dotenv_values
+from datetime import datetime
+
 
 config = dotenv_values('.env')
-bot = telebot.TeleBot('6354100486:AAF38bE-WiBuXw75EC30hczLi_cRm5onlaA')
+bot = telebot.TeleBot(config.get('TOKEN'))
 
 
 @bot.message_handler(commands=['start'])
@@ -31,8 +33,8 @@ def callback_menu(call):
   if call.data == 'shop':
     markup = types.InlineKeyboardMarkup()
     button2 = types.InlineKeyboardButton("Меню", callback_data='menu')
-    button3 = types.InlineKeyboardButton("Корзина", callback_data='yyy')
-    button4 = types.InlineKeyboardButton("Отзывы", url='https://google.com')
+    button3 = types.InlineKeyboardButton("История покупок", callback_data='history')
+    button4 = types.InlineKeyboardButton("Отзывы", callback_data='Otziv')
     button5 = types.InlineKeyboardButton("Пополнить баланс", callback_data='balance')
     markup.add(button2, button3, button4, button5)
     bot.send_photo(call.message.chat.id, 'https://i.postimg.cc/jC00fyct/image.png', caption="ВЫБЕРИТЕ", reply_markup=markup)
@@ -43,8 +45,8 @@ def callback_menu(call):
   if call.data == 'back1':
     markup = types.InlineKeyboardMarkup()
     button2 = types.InlineKeyboardButton("Меню", callback_data='menu')
-    button3 = types.InlineKeyboardButton("Корзина", callback_data='drink')
-    button4 = types.InlineKeyboardButton("Отзывы", url='https://google.com')
+    button3 = types.InlineKeyboardButton("История покупок", callback_data='history')
+    button4 = types.InlineKeyboardButton("Отзывы", callback_data='Otziv')
     button5 = types.InlineKeyboardButton("Пополнить баланс", callback_data='balance')
     markup.add(button2, button3, button4, button5)
     bot.send_photo(call.message.chat.id, 'https://i.postimg.cc/jC00fyct/image.png', caption="ВЫБЕРИТЕ", reply_markup=markup)
@@ -54,19 +56,38 @@ def callback_menu(call):
 def callback_menu(message):
     markup = types.InlineKeyboardMarkup()
     button2 = types.InlineKeyboardButton("Меню", callback_data='menu')
-    button3 = types.InlineKeyboardButton("Корзина", callback_data='yyy')
-    button4 = types.InlineKeyboardButton("Отзывы", url='https://google.com')
+    button3 = types.InlineKeyboardButton("История покупок", callback_data='history')
+    button4 = types.InlineKeyboardButton("Отзывы", callback_data='Otziv')
     button5 = types.InlineKeyboardButton("Пополнить баланс", callback_data='balance')
     markup.add(button2, button3, button4, button5)
     bot.send_photo(message.chat.id, 'https://i.postimg.cc/jC00fyct/image.png', caption="ВЫБЕРИТЕ", reply_markup=markup)
-    
-@bot.callback_query_handler(func=lambda call:call.data=='yyy')
-def callback_data(call):
-  if call.data == 'yyy':
+
+
+# ОТЗЫВЫ
+@bot.callback_query_handler(func=lambda call:call.data=='Otziv')
+def callback_menu(call):
+  if call.data == 'Otziv':
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton("Назад", callback_data='shop')
     markup.add(button1)
-    bot.send_message(call.message.chat.id, 'В разработке', reply_markup=markup)
+    bot.send_photo(call.message.chat.id, 'https://i.ibb.co/KNhmYX3/31.png' , caption="ОТЗЫВЫ", reply_markup=markup)
+
+
+# ИСТОРИЯ ПОКУПОК
+@bot.callback_query_handler(func=lambda call:call.data=='history')
+def callback_data(call):
+  if call.data == 'history':
+    id_user = call.from_user.id
+    connection = sqlite3.connect(config.get('DB'))
+    cursor = connection.cursor()
+    cursor.execute(f'SELECT item_id, date from bills where user_id = {id_user}')
+    history = cursor.fetchall()
+    history2 = history
+    buy_history = ('\n'.join(map(str, history2)))
+    markup = types.InlineKeyboardMarkup()
+    button1 = types.InlineKeyboardButton("Назад", callback_data='shop')
+    markup.add(button1)
+    bot.send_message(call.message.chat.id, f'История покупок {buy_history}', reply_markup=markup)
 
 
 # БАЛАНС
@@ -165,6 +186,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='bear+_buy')
 def callback_categoty(call):
   if call.data == 'bear+_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -177,12 +199,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 5')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
-    button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
+    button1 = types.InlineKeyboardButton("Назад", callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # ПИВНАЯ ТАРЕЛКА
 @bot.callback_query_handler(func=lambda call:call.data=='bear+')
@@ -198,6 +226,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='meat_buy')
 def callback_categoty(call):
   if call.data == 'meat_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -210,12 +239,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 6')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup() 
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # ВЯЛЕНАЯ ГОВЯДИНА
 @bot.callback_query_handler(func=lambda call:call.data=='meat+')
@@ -232,6 +267,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='chips_buy')
 def callback_categoty(call):
   if call.data == 'chips_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -244,12 +280,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 7')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 
 # ЧИПСЫ
@@ -272,8 +314,8 @@ def callback_categoty(call):
     button2 = types.InlineKeyboardButton("Пиво", callback_data='bear')
     button3 = types.InlineKeyboardButton("Чай/Кофе", callback_data='tea/coffe')
     button4 = types.InlineKeyboardButton("Крепкий алкоголь", callback_data='alcogol')
-    button1 = types.InlineKeyboardButton("Назад", callback_data='back2')
-    markup.add(button2, button3, button4)
+    button1 = types.InlineKeyboardButton("Назад", callback_data='back4')
+    markup.add(button2, button3, button4, button1)
     bot.send_message(call.message.chat.id, f"{name}, {msg}", reply_markup=markup)
 
 # BACK DRINK
@@ -286,7 +328,7 @@ def callback_categoty(call):
     button2 = types.InlineKeyboardButton("Пиво", callback_data='bear')
     button3 = types.InlineKeyboardButton("Чай/Кофе", callback_data='tea/coffe')
     button4 = types.InlineKeyboardButton("Крепкий алкоголь", callback_data='alcogol')
-    button1 = types.InlineKeyboardButton("Назад", callback_data='back2')
+    button1 = types.InlineKeyboardButton("Назад", callback_data='back4')
     markup.add(button2, button3, button4, button1)
     bot.send_message(call.message.chat.id, f"{name}, {msg}", reply_markup=markup)
 
@@ -294,6 +336,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='bear_buy')
 def callback_categoty(call):
   if call.data == 'bear_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -306,12 +349,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 11')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # ПИВО
 @bot.callback_query_handler(func=lambda call:call.data=='bear')
@@ -327,6 +376,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='tea_buy')
 def callback_categoty(call):
   if call.data == 'tea_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -339,12 +389,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 12')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # ЧАЙ КОФЕ
 @bot.callback_query_handler(func=lambda call:call.data=='tea/coffe')
@@ -360,6 +416,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='alcogol_buy')
 def callback_categoty(call):
   if call.data == 'alcogol_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -372,12 +429,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 13')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call:call.data=='alcogol')
@@ -401,7 +464,7 @@ def callback_categoty(call):
     button2 = types.InlineKeyboardButton("Суп", callback_data='soup')
     button3 = types.InlineKeyboardButton("Стрейк", callback_data='steak')
     button4 = types.InlineKeyboardButton("Рыба", callback_data='fish')
-    button1 = types.InlineKeyboardButton("Назад", callback_data='back2')
+    button1 = types.InlineKeyboardButton("Назад", callback_data='back4')
     markup.add(button2, button3, button4, button1)
     bot.send_message(call.message.chat.id, f"{name}, {msg}", reply_markup=markup)
 
@@ -415,7 +478,7 @@ def callback_categoty(call):
     button2 = types.InlineKeyboardButton("Суп", callback_data='soup')
     button3 = types.InlineKeyboardButton("Стрейк", callback_data='steak')
     button4 = types.InlineKeyboardButton("Рыба", callback_data='fish')
-    button1 = types.InlineKeyboardButton("Назад", callback_data='back2')
+    button1 = types.InlineKeyboardButton("Назад", callback_data='back4')
     markup.add(button2, button3, button4, button1)
     bot.send_message(call.message.chat.id, f"{name}, {msg}", reply_markup=markup)
 
@@ -423,6 +486,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='soup_buy')
 def callback_categoty(call):
   if call.data == 'soup_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -435,12 +499,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 8')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # СУП
 @bot.callback_query_handler(func=lambda call:call.data=='soup')
@@ -456,6 +526,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='steak_buy')
 def callback_categoty(call):
   if call.data == 'steak_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -467,13 +538,18 @@ def callback_categoty(call):
     result_2 = cursor.fetchone()
     item = result_2[0]
     new_balance = balance - item
+    cursor.execute(f'SELECT name from items WHERE id = 9')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 # СТЕЙК
 @bot.callback_query_handler(func=lambda call:call.data=='steak')
@@ -489,6 +565,7 @@ def callback_categoty(call):
 @bot.callback_query_handler(func=lambda call:call.data =='fish_buy')
 def callback_categoty(call):
   if call.data == 'fish_buy':
+    time = datetime.now()
     id_user = call.from_user.id
     connection = sqlite3.connect(config.get('DB'))
     cursor = connection.cursor()
@@ -501,12 +578,18 @@ def callback_categoty(call):
     item = result_2[0]
     new_balance = balance - item
     cursor.execute(f'UPDATE users SET balance = {new_balance} WHERE id = {id_user}')
+    cursor.fetchall()
+    cursor.execute(f'SELECT name from items WHERE id = 10')
+    item_name = cursor.fetchall()
+    name = item_name[0]
+    name_item = name[0]
+    cursor.execute('INSERT INTO bills (user_id, item_id, date) VALUES (?,?,?)',(id_user, name_item, time))
     connection.commit()
     connection.close()
     markup = types.InlineKeyboardMarkup()
     button1 = types.InlineKeyboardButton('Назад', callback_data='menu')
     markup.add(button1)
-    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}')
+    bot.send_message(call.from_user.id, f'Покупка совершена ожидайте доставку! Ваш баланс:{new_balance}', reply_markup=markup)
 
 
 # РЫБА
